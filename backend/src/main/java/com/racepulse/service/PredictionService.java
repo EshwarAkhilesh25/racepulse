@@ -15,61 +15,77 @@ public class PredictionService {
 
   private static final Logger log = LoggerFactory.getLogger(PredictionService.class);
   private final StandingsService standingsService;
+  private final ScheduleService scheduleService;
 
-  public PredictionService(StandingsService standingsService) {
+  public PredictionService(StandingsService standingsService, ScheduleService scheduleService) {
     this.standingsService = standingsService;
+    this.scheduleService = scheduleService;
   }
 
   public Mono<PredictionDTO> getPredictions() {
-    return standingsService.getStandings()
-      .map(standings -> {
-        List<DriverDTO> drivers = standings.getDrivers();
-        List<PredictionDTO.DriverPrediction> driverPreds = new ArrayList<>();
-        List<PredictionDTO.ChampionshipProjection> driverProj = new ArrayList<>();
+    return Mono.zip(
+      standingsService.getStandings(),
+      scheduleService.getSchedule()
+    ).map(tuple -> {
+      var standings = tuple.getT1();
+      var schedule = tuple.getT2();
 
-        for (DriverDTO d : drivers) {
-          int min = Math.max(1, d.getPosition() - 1);
-          int max = Math.min(20, d.getPosition() + 2);
-          int median = d.getPosition();
+      String nextRaceName = schedule.stream()
+        .filter(r -> "UPCOMING".equalsIgnoreCase(r.getStatus()) || "LIVE".equalsIgnoreCase(r.getStatus()))
+        .findFirst()
+        .map(r -> r.getRaceName() + " (Round " + r.getRound() + ")")
+        .orElse("Upcoming Grand Prix");
 
-          String trend = d.getPosition() <= 3 ? "UPWARD" : (d.getPosition() <= 8 ? "STABLE" : "VARIED");
-          double conversion = Math.max(40.0, 92.0 - (d.getPosition() * 4.5));
-          double conf = Math.max(70.0, 95.0 - (d.getPosition() * 1.8));
+      long completedCount = schedule.stream().filter(r -> "COMPLETED".equalsIgnoreCase(r.getStatus())).count();
+      int totalRounds = schedule.size() > 0 ? schedule.size() : 24;
+      int remainingRaces = Math.max(1, totalRounds - (int) completedCount);
 
-          driverPreds.add(PredictionDTO.DriverPrediction.builder()
-            .driverCode(d.getCode())
-            .driverName(d.getFullName())
-            .constructorName(d.getConstructorName())
-            .teamColor(d.getTeamColor())
-            .expectedFinishMin(min)
-            .expectedFinishMax(max)
-            .expectedFinishMedian(median)
-            .recentTrend(trend)
-            .qualifyingConversionRate(conversion)
-            .confidenceIndex(conf)
-            .statisticalNote("Statistical estimate calculated from 5-session rolling weighted pace & pit efficiency.")
-            .build());
+      List<DriverDTO> drivers = standings.getDrivers();
+      List<PredictionDTO.DriverPrediction> driverPreds = new ArrayList<>();
+      List<PredictionDTO.ChampionshipProjection> driverProj = new ArrayList<>();
 
-          int remainingRaces = 6;
-          int estPtsPerRace = (int)(d.getPoints() / 16.0);
-          driverProj.add(PredictionDTO.ChampionshipProjection.builder()
-            .name(d.getFullName())
-            .teamColor(d.getTeamColor())
-            .currentPoints(d.getPoints())
-            .projectedEndSeasonPointsMin(d.getPoints() + (estPtsPerRace * remainingRaces - 10))
-            .projectedEndSeasonPointsMax(d.getPoints() + (estPtsPerRace * remainingRaces + 15))
-            .projectedEndSeasonPointsMedian(d.getPoints() + (estPtsPerRace * remainingRaces))
-            .projectedFinalPosition(d.getPosition())
-            .build());
-        }
+      for (DriverDTO d : drivers) {
+        int min = Math.max(1, d.getPosition() - 1);
+        int max = Math.min(20, d.getPosition() + 2);
+        int median = d.getPosition();
 
-        return PredictionDTO.builder()
-          .modelType("Statistical Multi-Variable Trend Projection (Statistical Estimate)")
-          .disclaimer("Estimates calculated from rolling historical session timing, qualifying conversion rates, and finishing variance. All metrics are transparent statistical models.")
-          .nextRaceName("Singapore Grand Prix 2026")
-          .driverPredictions(driverPreds)
-          .driverChampionshipProjections(driverProj)
-          .build();
-      });
+        String trend = d.getPosition() <= 3 ? "UPWARD" : (d.getPosition() <= 8 ? "STABLE" : "VARIED");
+        double conversion = Math.max(40.0, 92.0 - (d.getPosition() * 4.5));
+        double conf = Math.max(70.0, 95.0 - (d.getPosition() * 1.8));
+
+        driverPreds.add(PredictionDTO.DriverPrediction.builder()
+          .driverCode(d.getCode())
+          .driverName(d.getFullName())
+          .constructorName(d.getConstructorName())
+          .teamColor(d.getTeamColor())
+          .expectedFinishMin(min)
+          .expectedFinishMax(max)
+          .expectedFinishMedian(median)
+          .recentTrend(trend)
+          .qualifyingConversionRate(conversion)
+          .confidenceIndex(conf)
+          .statisticalNote("Statistical estimate calculated from 2026 rolling race pace & finishing variance.")
+          .build());
+
+        int estPtsPerRace = (int) (d.getPoints() / Math.max(1.0, (double) completedCount));
+        driverProj.add(PredictionDTO.ChampionshipProjection.builder()
+          .name(d.getFullName())
+          .teamColor(d.getTeamColor())
+          .currentPoints(d.getPoints())
+          .projectedEndSeasonPointsMin(d.getPoints() + Math.max(0, estPtsPerRace * remainingRaces - 10))
+          .projectedEndSeasonPointsMax(d.getPoints() + (estPtsPerRace * remainingRaces + 15))
+          .projectedEndSeasonPointsMedian(d.getPoints() + (estPtsPerRace * remainingRaces))
+          .projectedFinalPosition(d.getPosition())
+          .build());
+      }
+
+      return PredictionDTO.builder()
+        .modelType("Statistical Multi-Variable Trend Projection (Statistical Estimate)")
+        .disclaimer("Estimates calculated from rolling championship standings, points-per-round trajectory, and finishing variance. All predictions are transparent mathematical models.")
+        .nextRaceName(nextRaceName)
+        .driverPredictions(driverPreds)
+        .driverChampionshipProjections(driverProj)
+        .build();
+    });
   }
 }

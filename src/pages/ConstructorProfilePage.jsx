@@ -50,11 +50,12 @@ export default function ConstructorProfilePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-3 bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center font-mono text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-slate-900/80 p-3 sm:p-4 rounded-xl border border-slate-800 text-center font-mono text-xs">
           <div>
             <span className="text-slate-500 block text-[10px]">TOTAL PTS</span>
             <span className="text-amber-400 font-black text-lg">{constructor.points}</span>
           </div>
+
           <div>
             <span className="text-slate-500 block text-[10px]">WINS</span>
             <span className="text-slate-200 font-bold text-lg">{constructor.wins}</span>

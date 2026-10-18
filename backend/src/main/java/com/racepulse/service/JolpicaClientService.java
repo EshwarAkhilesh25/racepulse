@@ -23,7 +23,7 @@ public class JolpicaClientService {
 
   public Mono<String> getDriverStandings() {
     return webClient.get()
-      .uri("/2026/driverStandings.json")
+      .uri("/current/driverStandings.json")
       .retrieve()
       .bodyToMono(String.class)
       .timeout(Duration.ofSeconds(15))
@@ -33,7 +33,7 @@ public class JolpicaClientService {
 
   public Mono<String> getConstructorStandings() {
     return webClient.get()
-      .uri("/2026/constructorStandings.json")
+      .uri("/current/constructorStandings.json")
       .retrieve()
       .bodyToMono(String.class)
       .timeout(Duration.ofSeconds(15))
@@ -59,5 +59,15 @@ public class JolpicaClientService {
       .timeout(Duration.ofSeconds(15))
       .retryWhen(Retry.fixedDelay(2, Duration.ofSeconds(1)))
       .doOnError(e -> log.error("Jolpica Last Results error: {}", e.getMessage()));
+  }
+
+  public Mono<String> getHistoricalResults(int season) {
+    return webClient.get()
+      .uri("/" + season + "/results.json?limit=100")
+      .retrieve()
+      .bodyToMono(String.class)
+      .timeout(Duration.ofSeconds(15))
+      .retryWhen(Retry.fixedDelay(1, Duration.ofSeconds(1)))
+      .doOnError(e -> log.error("Jolpica Historical Results error for {}: {}", season, e.getMessage()));
   }
 }

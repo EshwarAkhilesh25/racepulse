@@ -2,6 +2,13 @@ import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
+export const apiUrl = (path = '') => {
+  const base = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1').replace(/\/api\/v1\/?$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${cleanPath}`;
+};
+
+
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 12000,

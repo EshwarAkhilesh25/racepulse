@@ -25,12 +25,13 @@ export default function SchedulePage() {
 
         <div className="flex items-center gap-3 text-xs font-mono">
           <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg">
-            16 Completed
+            {schedule.filter(r => r.status === 'COMPLETED').length} Completed
           </span>
           <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-lg">
-            8 Upcoming
+            {schedule.filter(r => r.status === 'UPCOMING' || r.status === 'LIVE').length} Upcoming
           </span>
         </div>
+
       </div>
 
       {/* Race Grid */}

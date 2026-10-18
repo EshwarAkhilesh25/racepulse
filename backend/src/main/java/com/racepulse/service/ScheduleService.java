@@ -9,8 +9,10 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ScheduleService {
@@ -22,6 +24,25 @@ public class ScheduleService {
   private final CacheService cacheService;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  private static final Map<Integer, String[]> WINNERS_2026 = Map.ofEntries(
+    Map.entry(1, new String[]{"Lando Norris", "McLaren"}),
+    Map.entry(2, new String[]{"Max Verstappen", "Red Bull Racing"}),
+    Map.entry(3, new String[]{"Max Verstappen", "Red Bull Racing"}),
+    Map.entry(4, new String[]{"Charles Leclerc", "Ferrari"}),
+    Map.entry(5, new String[]{"Lando Norris", "McLaren"}),
+    Map.entry(6, new String[]{"Lando Norris", "McLaren"}),
+    Map.entry(7, new String[]{"Max Verstappen", "Red Bull Racing"}),
+    Map.entry(8, new String[]{"Charles Leclerc", "Ferrari"}),
+    Map.entry(9, new String[]{"Max Verstappen", "Red Bull Racing"}),
+    Map.entry(10, new String[]{"Max Verstappen", "Red Bull Racing"}),
+    Map.entry(11, new String[]{"George Russell", "Mercedes"}),
+    Map.entry(12, new String[]{"Lewis Hamilton", "Ferrari"}),
+    Map.entry(13, new String[]{"Oscar Piastri", "McLaren"}),
+    Map.entry(14, new String[]{"Lewis Hamilton", "Ferrari"}),
+    Map.entry(15, new String[]{"Lando Norris", "McLaren"}),
+    Map.entry(16, new String[]{"Charles Leclerc", "Ferrari"})
+  );
+
   public ScheduleService(JolpicaClientService jolpicaClient, CacheService cacheService) {
     this.jolpicaClient = jolpicaClient;
     this.cacheService = cacheService;
@@ -31,14 +52,13 @@ public class ScheduleService {
   public Mono<List<RaceScheduleDTO>> getSchedule() {
     List<RaceScheduleDTO> cached = cacheService.get(CACHE_KEY_SCHEDULE, List.class);
     if (cached != null) {
-      log.info("Returning cached 2026 race calendar");
       return Mono.just(cached);
     }
 
     return jolpicaClient.getCurrentSchedule()
       .map(this::parseSchedule)
       .onErrorResume(e -> {
-        log.error("Failed fetching schedule: {}", e.getMessage());
+        log.error("Failed fetching schedule from Jolpica: {}", e.getMessage());
         return Mono.just(createFallbackSchedule());
       })
       .map(schedule -> {
@@ -70,7 +90,12 @@ public class ScheduleService {
           String qualiDate = raceNode.path("Qualifying").path("date").asText("");
           String qualiTime = raceNode.path("Qualifying").path("time").asText("15:00:00Z");
 
+          String raceUTC = raceDate.isEmpty() ? null : (raceDate + "T" + raceTime);
+          String qualiUTC = qualiDate.isEmpty() ? null : (qualiDate + "T" + qualiTime);
           boolean hasSprint = raceNode.has("Sprint");
+
+          String status = determineRaceStatus(raceUTC, round);
+          String[] winnerInfo = WINNERS_2026.get(round);
 
           list.add(RaceScheduleDTO.builder()
             .round(round)
@@ -79,12 +104,12 @@ public class ScheduleService {
             .country(country)
             .city(city)
             .flagEmoji(resolveFlag(country))
-            .raceUTC(raceDate.isEmpty() ? null : (raceDate + "T" + raceTime))
-            .qualifyingUTC(qualiDate.isEmpty() ? null : (qualiDate + "T" + qualiTime))
+            .raceUTC(raceUTC)
+            .qualifyingUTC(qualiUTC)
             .hasSprint(hasSprint)
-            .status(round < 17 ? "COMPLETED" : (round == 17 ? "LIVE" : "UPCOMING"))
-            .winnerName(round < 17 ? "Lando Norris" : null)
-            .winningConstructor(round < 17 ? "McLaren" : null)
+            .status(status)
+            .winnerName("COMPLETED".equals(status) && winnerInfo != null ? winnerInfo[0] : null)
+            .winningConstructor("COMPLETED".equals(status) && winnerInfo != null ? winnerInfo[1] : null)
             .build());
         }
       }
@@ -93,6 +118,25 @@ public class ScheduleService {
     }
 
     return list;
+  }
+
+  private String determineRaceStatus(String raceUTC, int round) {
+    if (raceUTC == null || raceUTC.isBlank()) {
+      return round < 17 ? "COMPLETED" : "UPCOMING";
+    }
+    try {
+      Instant raceInstant = Instant.parse(raceUTC);
+      Instant now = Instant.now();
+      if (now.isAfter(raceInstant.plus(Duration.ofHours(4)))) {
+        return "COMPLETED";
+      } else if (now.isAfter(raceInstant.minus(Duration.ofHours(1)))) {
+        return "LIVE";
+      } else {
+        return "UPCOMING";
+      }
+    } catch (Exception e) {
+      return round < 17 ? "COMPLETED" : "UPCOMING";
+    }
   }
 
   public List<RaceScheduleDTO> createFallbackSchedule() {

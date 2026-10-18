@@ -21,14 +21,52 @@ public class OpenF1ClientService {
     this.webClient = builder.baseUrl(baseUrl).build();
   }
 
-  public Mono<String> getLivePositionData() {
+  public Mono<String> getLivePositionData(String sessionKey) {
+    String uri = (sessionKey == null || sessionKey.isBlank() || "latest".equalsIgnoreCase(sessionKey))
+      ? "/position?session_key=latest"
+      : "/position?session_key=" + sessionKey;
+
     return webClient.get()
-      .uri("/position?session_key=latest")
+      .uri(uri)
       .retrieve()
       .bodyToMono(String.class)
       .timeout(Duration.ofSeconds(10))
       .retryWhen(Retry.fixedDelay(2, Duration.ofMillis(500)))
       .doOnError(e -> log.error("OpenF1 API Live Position error: {}", e.getMessage()))
+      .onErrorReturn("[]");
+  }
+
+  public Mono<String> getLivePositionData() {
+    return getLivePositionData("latest");
+  }
+
+  public Mono<String> getWeather(String sessionKey) {
+    String uri = (sessionKey == null || sessionKey.isBlank() || "latest".equalsIgnoreCase(sessionKey))
+      ? "/weather?session_key=latest"
+      : "/weather?session_key=" + sessionKey;
+
+    return webClient.get()
+      .uri(uri)
+      .retrieve()
+      .bodyToMono(String.class)
+      .timeout(Duration.ofSeconds(10))
+      .retryWhen(Retry.fixedDelay(1, Duration.ofMillis(500)))
+      .doOnError(e -> log.warn("OpenF1 API Weather warning: {}", e.getMessage()))
+      .onErrorReturn("[]");
+  }
+
+  public Mono<String> getRaceControl(String sessionKey) {
+    String uri = (sessionKey == null || sessionKey.isBlank() || "latest".equalsIgnoreCase(sessionKey))
+      ? "/race_control?session_key=latest"
+      : "/race_control?session_key=" + sessionKey;
+
+    return webClient.get()
+      .uri(uri)
+      .retrieve()
+      .bodyToMono(String.class)
+      .timeout(Duration.ofSeconds(10))
+      .retryWhen(Retry.fixedDelay(1, Duration.ofMillis(500)))
+      .doOnError(e -> log.warn("OpenF1 API Race Control warning: {}", e.getMessage()))
       .onErrorReturn("[]");
   }
 

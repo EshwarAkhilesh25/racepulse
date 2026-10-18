@@ -25,14 +25,14 @@ export default function LiveRacePage() {
   }
 
   const session = sessionData || {
-    sessionName: 'Singapore Grand Prix - Live Race Telemetry',
-    circuitName: 'Marina Bay Street Circuit',
-    currentLap: 42,
-    totalLaps: 62,
-    sessionStatus: 'LIVE',
+    sessionName: 'Session Telemetry Offline',
+    circuitName: 'Connecting to RacePulse stream...',
+    currentLap: 0,
+    totalLaps: 0,
+    sessionStatus: 'OFFLINE',
     positions: [],
     recentIncidents: [],
-    weather: { airTempCelsius: 29.4, trackTempCelsius: 41.8, humidityPercent: 68, windSpeedKmh: 12.5 }
+    weather: { airTempCelsius: 0, trackTempCelsius: 0, humidityPercent: 0, windSpeedKmh: 0 }
   };
 
   const positions = session.positions || [];
@@ -45,17 +45,22 @@ export default function LiveRacePage() {
       {/* Session Top Bar */}
       <div className="glass-panel p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-cyan-500/20">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <span className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-mono font-bold animate-pulse">
-              <Radio size={14} /> LIVE SESSION
+          <div className="flex flex-wrap items-center gap-3 mb-1">
+            <span className={`flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-mono font-bold ${
+              session.sessionStatus === 'LIVE'
+                ? 'bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse'
+                : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+            }`}>
+              <Radio size={14} /> {session.sessionStatus === 'LIVE' ? 'LIVE TRACK SESSION' : 'OFFICIAL RACE CLASSIFICATION'}
             </span>
             <ConnectionBadge status={connectionStatus} isFallback={isUsingFallback} />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">{session.sessionName}</h1>
-          <p className="text-sm text-slate-400 font-mono mt-0.5">{session.circuitName} • LAP {session.currentLap} / {session.totalLaps}</p>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white font-mono tracking-tight">{session.sessionName}</h1>
+          <p className="text-xs sm:text-sm text-slate-400 font-mono mt-0.5">{session.circuitName} • {session.sessionStatus === 'LIVE' ? `LAP ${session.currentLap} / ${session.totalLaps}` : 'FINAL CLASSIFICATION'}</p>
         </div>
 
-        <div className="flex items-center gap-4 bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-xs font-mono">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-xs font-mono">
+
           <div>
             <span className="text-slate-500 block text-[10px]">TRACK TEMP</span>
             <span className="text-amber-400 font-bold text-base">{weather.trackTempCelsius || 41.8}°C</span>
@@ -110,52 +115,60 @@ export default function LiveRacePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/40">
-              {positions.map((driver) => {
-                const delta = driver.positionDelta || 0;
-                return (
-                  <tr key={driver.driverNumber} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 font-bold text-cyan-400 text-sm">P{driver.position}</td>
-                    <td className="py-3">
-                      {delta > 0 ? (
-                        <span className="inline-flex items-center text-emerald-400 font-bold"><ArrowUp size={12} />{delta}</span>
-                      ) : delta < 0 ? (
-                        <span className="inline-flex items-center text-red-400 font-bold"><ArrowDown size={12} />{Math.abs(delta)}</span>
-                      ) : (
-                        <span className="inline-flex items-center text-slate-600"><Minus size={12} /></span>
-                      )}
-                    </td>
-                    <td className="py-3 font-bold text-slate-100">
-                      <div className="flex items-center gap-2">
-                        <TeamColorBadge color={driver.teamColor} name={driver.driverCode} />
-                        <span className="text-slate-400 text-[11px] font-normal">{driver.driverName}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 font-semibold text-slate-200">{driver.gapToLeader}</td>
-                    <td className="py-3 text-slate-400">{driver.intervalToAhead}</td>
-                    <td className="py-3 text-cyan-300 font-semibold">{driver.lastLapTime}</td>
-                    <td className="py-3 text-purple-400">{driver.bestLapTime}</td>
-                    <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        driver.tyreCompound === 'SOFT' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                        driver.tyreCompound === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                        'bg-slate-200/20 text-slate-200 border border-slate-400/30'
-                      }`}>
-                        {driver.tyreCompound} ({driver.currentStintLaps}L)
-                      </span>
-                    </td>
-                    <td className="py-3 text-slate-300">{driver.sector1}</td>
-                    <td className="py-3 text-slate-300">{driver.sector2}</td>
-                    <td className="py-3 text-slate-300">{driver.sector3}</td>
-                    <td className="py-3 text-right">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        driver.isPitting ? 'bg-amber-500/20 text-amber-300 animate-pulse' : 'bg-emerald-500/10 text-emerald-400'
-                      }`}>
-                        {driver.isPitting ? 'IN PIT' : driver.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+              {positions.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="py-8 text-center text-slate-400 font-mono">
+                    No active timing positions recorded for this session yet.
+                  </td>
+                </tr>
+              ) : (
+                positions.map((driver) => {
+                  const delta = driver.positionDelta || 0;
+                  return (
+                    <tr key={driver.driverNumber} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-3 font-bold text-cyan-400 text-sm">P{driver.position}</td>
+                      <td className="py-3">
+                        {delta > 0 ? (
+                          <span className="inline-flex items-center text-emerald-400 font-bold"><ArrowUp size={12} />{delta}</span>
+                        ) : delta < 0 ? (
+                          <span className="inline-flex items-center text-red-400 font-bold"><ArrowDown size={12} />{Math.abs(delta)}</span>
+                        ) : (
+                          <span className="inline-flex items-center text-slate-600"><Minus size={12} /></span>
+                        )}
+                      </td>
+                      <td className="py-3 font-bold text-slate-100">
+                        <div className="flex items-center gap-2">
+                          <TeamColorBadge color={driver.teamColor} name={driver.driverCode} />
+                          <span className="text-slate-400 text-[11px] font-normal">{driver.driverName}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 font-semibold text-slate-200">{driver.gapToLeader}</td>
+                      <td className="py-3 text-slate-400">{driver.intervalToAhead}</td>
+                      <td className="py-3 text-cyan-300 font-semibold">{driver.lastLapTime}</td>
+                      <td className="py-3 text-purple-400">{driver.bestLapTime}</td>
+                      <td className="py-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          driver.tyreCompound === 'SOFT' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                          driver.tyreCompound === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                          'bg-slate-200/20 text-slate-200 border border-slate-400/30'
+                        }`}>
+                          {driver.tyreCompound} ({driver.currentStintLaps}L)
+                        </span>
+                      </td>
+                      <td className="py-3 text-slate-300">{driver.sector1}</td>
+                      <td className="py-3 text-slate-300">{driver.sector2}</td>
+                      <td className="py-3 text-slate-300">{driver.sector3}</td>
+                      <td className="py-3 text-right">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          driver.isPitting ? 'bg-amber-500/20 text-amber-300 animate-pulse' : 'bg-emerald-500/10 text-emerald-400'
+                        }`}>
+                          {driver.isPitting ? 'IN PIT' : driver.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
